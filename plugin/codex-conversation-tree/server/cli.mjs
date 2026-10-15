@@ -1,14 +1,16 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { action, ensureRuntime, settings, pluginRoot } from './runtime.mjs';
+import { openPanel, ensureRuntime, settings, pluginRoot } from './runtime.mjs';
 
 const [command = 'doctor', ...args] = process.argv.slice(2);
 const value = name => { const at = args.indexOf(name); return at >= 0 ? args[at + 1] : undefined; };
 try {
   if (command === 'open') {
     const threadId = value('--thread-id');
-    const data = threadId ? await action('link', { threadId }) : await action('state');
-    console.log(JSON.stringify({ panelUrl: `http://127.0.0.1:${settings.port}/`, treeId: data.tree?.id, threadId: threadId || null, nodeCount: data.tree?.nodes.length || 0, dataDir: settings.dataDir }, null, 2));
+    const data = await openPanel(threadId);
+    const panel = new URL(`http://127.0.0.1:${settings.port}/`);
+    if (threadId) panel.searchParams.set('threadId',threadId);else if (data.tree?.id) panel.searchParams.set('treeId',data.tree.id);
+    console.log(JSON.stringify({ panelUrl: panel.href, treeId: data.tree?.id, threadId: threadId || null, nodeCount: data.tree?.nodes.length || 0, dataDir: settings.dataDir }, null, 2));
   } else if (command === 'start') { await ensureRuntime();console.log(JSON.stringify({ panelUrl: `http://127.0.0.1:${settings.port}/` })); }
   else if (command === 'doctor') {
     let health = null;try { const r = await fetch(`http://127.0.0.1:${settings.port}/health`, { signal: AbortSignal.timeout(1000) });health = await r.json(); } catch {}

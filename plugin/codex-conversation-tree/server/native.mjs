@@ -4,6 +4,7 @@ import { Store, now, uid } from './store.mjs';
 import { Codex } from './codex.mjs';
 import { parseTranscript, parseTurns } from './transcript.mjs';
 import { NativeDeletion } from './deletion.mjs';
+import { TreeManagement, displayTitle, missingThread } from './management.mjs';
 
 export class NativeTree {
   constructor(settings) {
@@ -11,7 +12,7 @@ export class NativeTree {
     this.store.state.nativeSessions ||= [];
     process.env.CODEX_BINARY ||= settings.codexBinary;
     this.engine = this.newEngine(); this.forkEngines = new Set();
-    this.deletion = new NativeDeletion(this);
+    this.deletion = new NativeDeletion(this);this.management = new TreeManagement(this);this.forkingTrees = new Map();this.runtimeId = uid('runtime');
     this.stats = new Map(); this.apiSnapshots = new Map(); this.visibleSnapshots = new Map(); this.apiInFlight = new Set(); this.version = 0; this.lastError = null;
     for (const s of this.sessions()) delete s.syncing;
     this.syncAll();
@@ -19,6 +20,7 @@ export class NativeTree {
     this.apiTimer = setInterval(() => { for (const s of this.sessions().filter(s => s.recording)) void this.syncApi(s).catch(e => { s.error = e.message; }); }, 3000);
   }
   sessions() { return this.store.state.nativeSessions; }
+  activeTree(id) { return this.management.activeTree(id); }
   mainThreadId(tree) { return tree.native?.mainThreadId || tree.native?.rootThreadId; }
   threadTitle(tree, id) { return tree.native?.forks?.find(f => f.threadId === id)?.title || (id === tree.native?.rootThreadId ? `原始主线 · ${tree.title}` : `分支 · ${id.slice(0, 8)}`); }
   descendantIds(tree, id, retainMain = false) {
@@ -30,10 +32,10 @@ export class NativeTree {
     return ids;
   }
   promoteMain({ treeId, threadId }) {
-    const tree = this.store.tree(treeId), session = this.sessions().find(s => s.treeId === tree.id && s.threadId === threadId);
+    const tree = this.activeTree(treeId), session = this.sessions().find(s => s.treeId === tree.id && s.threadId === threadId);
     if (!tree.native?.rootThreadId) throw new Error('此树尚未确认原生会话来源，暂不能设置主分支');
     if (!session) throw new Error('只能将这棵树中已关联的会话设为主分支');
-    if (session.nativeDeletedAt || this.isPruned(session)) throw new Error('请先恢复这条分支，已删除的原生会话不能设为主分支');
+    if (session.nativeDeletedAt || session.sourceStatus === 'missing' || this.isPruned(session)) throw new Error('请先恢复这条分支，已删除或已失效的原生会话不能设为主分支');
     if (this.deletion.executing || tree.native?.deletions?.some(d => d.status === 'pending')) throw new Error('原生删除进行中或结果待核验，暂不能切换主分支');
     const previous = this.mainThreadId(tree);
     if (previous === threadId) return this.state(tree.id);
@@ -46,7 +48,7 @@ export class NativeTree {
     return this.sessions().filter(s => s.treeId === tree.id).map(s => {
       const containsMain = this.descendantIds(tree, s.threadId).has(this.mainThreadId(tree));
       const isMain = s.threadId === this.mainThreadId(tree), isOrigin = s.threadId === tree.native?.rootThreadId;
-      return { threadId: s.threadId, title: this.threadTitle(tree, s.threadId), isMain, isOrigin, pruned: this.isPruned(s), nativeDeletedAt: s.nativeDeletedAt, pruneThreadIds: [...this.descendantIds(tree, s.threadId, true)], canDeleteNative: !isOrigin && !containsMain && !s.nativeDeletedAt, nativeDeletionReason: isOrigin ? '原始会话仍是原生历史来源，本版支持剪枝，尚不支持永久删除它。' : containsMain ? '此路径包含当前主分支，不能整支永久删除；剪枝会保留主分支。' : null };
+      return { threadId: s.threadId, title: this.threadTitle(tree, s.threadId), isMain, isOrigin, sourceStatus: s.sourceStatus, pruned: this.isPruned(s), nativeDeletedAt: s.nativeDeletedAt, pruneThreadIds: [...this.descendantIds(tree, s.threadId, true)], canDeleteNative: !isOrigin && !containsMain && !s.nativeDeletedAt && s.sourceStatus !== 'missing', nativeDeletionReason: s.sourceStatus === 'missing' ? '原生会话已不可用，本地记录仍保留。' : isOrigin ? '原始会话仍是原生历史来源，本版支持剪枝，尚不支持永久删除它。' : containsMain ? '此路径包含当前主分支，不能整支永久删除；剪枝会保留主分支。' : null };
     });
   }
   newEngine() { return new Codex(this.settings.codexHome, { experimentalApi: true }); }
@@ -67,21 +69,22 @@ export class NativeTree {
   prunedThreadIds(tree) {
     return new Set([...(tree.native?.prunes || []).filter(p => !p.restoredAt).flatMap(p => p.threadIds), ...this.sessions().filter(s => s.treeId === tree.id && s.nativeDeletedAt).map(s => s.threadId)]);
   }
-  isPruned(session) { return this.prunedThreadIds(this.store.tree(session.treeId)).has(session.threadId); }
+  isPruned(session) { const tree = this.store.tree(session.treeId);return Boolean(tree.deletedAt) || this.prunedThreadIds(tree).has(session.threadId); }
   visibleNodes(tree) {
     const pruned = this.prunedThreadIds(tree);
     return tree.nodes.filter(n => (n.bindings?.length ? n.bindings.map(b => b.threadId) : [n.nativeThreadId]).some(id => !pruned.has(id)));
   }
   updatePrompt(node, question) {
     if (node.question === question) return;
-    if (node.title === node.question?.split('\n')[0].slice(0, 70)) node.title = question.split('\n')[0].slice(0, 70);
+    if (!node.titleCustomized && node.title === node.question?.split('\n')[0].slice(0, 70)) node.title = question.split('\n')[0].slice(0, 70);
     node.question = question;
   }
-  async link(threadId, title) {
+  async link(threadId, title, contextThreadId = threadId) {
     if (typeof threadId !== 'string' || !/^[a-zA-Z0-9_-]{10,100}$/.test(threadId)) throw new Error('对话 ID 无效');
     const existing = this.sessions().find(s => s.threadId === threadId);
+    if (existing) this.activeTree(existing.treeId);
     if (existing?.nativeDeletedAt) throw new Error('原生会话已经永久删除，本地记录仍保留');
-    if (existing) { if (this.isPruned(existing)) throw new Error('此分支已剪掉，请先在“已剪分支”中恢复'); existing.recording = true; this.stats.delete(threadId); this.syncAll(); await this.syncApi(existing); return this.state(existing.treeId); }
+    if (existing) { if (this.isPruned(existing)) throw new Error('此分支已剪掉，请先在“已剪分支”中恢复'); existing.recording = true; this.stats.delete(threadId); this.syncAll(); await this.syncApi(existing); return this.state(existing.treeId, { threadId: contextThreadId }); }
     await this.engine.connect();
     const { thread } = await this.engine.rpc('thread/read', { threadId, includeTurns: false });
     if (!thread.path) throw new Error('当前对话没有本机可读取的持久化记录');
@@ -90,13 +93,14 @@ export class NativeTree {
     const parsed = parseTranscript(fs.readFileSync(source, 'utf8'));
     if (parsed.meta?.id !== threadId) throw new Error('对话记录与请求 ID 不一致');
     const parent = this.sessions().find(s => s.threadId === thread.forkedFromId);
+    if (parent) this.activeTree(parent.treeId);
     if (parent && this.isPruned(parent)) throw new Error('父分支已剪掉，请先恢复父分支');
     const tree = parent ? this.store.tree(parent.treeId) : this.store.createTree(title || thread.name || 'Codex 对话树');
     tree.native ||= { rootThreadId: threadId, importedAt: now(), observer: 'scoped-transcript' };
     const session = { threadId, treeId: tree.id, path: source, cwd: thread.cwd, parentThreadId: thread.forkedFromId || null, recording: true, linkedAt: now() };
     this.sessions().push(session);
     this.stats.delete(threadId); this.syncAll(); await this.syncApi(session); this.store.save(); this.version++;
-    return this.state(tree.id);
+    return this.state(tree.id, { threadId: contextThreadId });
   }
   syncAll() {
     let changed = false;
@@ -143,6 +147,7 @@ export class NativeTree {
       } while (cursor && turns.length < 10000);
       // A prune may occur while the read is in flight. Do not commit its result.
       if (this.deletion.executing || !session.recording || this.isPruned(session)) return;
+      if (session.sourceStatus !== 'available') this.management.setSource(session, 'available');
       const tree = this.store.tree(session.treeId), incoming = parseTurns(turns, tree.nodes);
       const signature = JSON.stringify(incoming); if (this.apiSnapshots.get(session.threadId) === signature) return;
       for (const n of incoming) {
@@ -152,21 +157,29 @@ export class NativeTree {
         if (node.nativeThreadId === session.threadId) { this.updatePrompt(node, n.question); Object.assign(node, { status: n.status, answer: n.answer, messages: n.messages, forkable: n.forkable }); }
       }
       this.apiSnapshots.set(session.threadId, signature); session.nodeCount = incoming.length; session.lastSyncedAt = now(); session.error = null; this.store.save(); this.version++;
+    } catch (error) {
+      if (missingThread(error) && !this.store.tree(session.treeId).deletedAt) await this.management.probe(session);
+      throw error;
     } finally { this.apiInFlight.delete(session.threadId); }
   }
-  state(treeId) {
-    this.syncAll(); const selected = treeId ? this.store.tree(treeId) : this.store.state.trees.at(-1);
+  state(treeId, { threadId } = {}) {
+    this.syncAll(); const { selected, context, trees, catalog } = this.management.selection(treeId, threadId);
     const visible = selected ? this.visibleNodes(selected) : [];
     const pruned = selected ? this.prunedThreadIds(selected) : new Set();
     const view = selected ? { ...selected, nodes: visible, prunedNodeCount: selected.nodes.length - visible.length, prunedBranches: (selected.native?.prunes || []).filter(p => !p.restoredAt).map(p => ({ ...p, nativeDeletedAt: this.sessions().find(s => s.threadId === p.rootThreadId)?.nativeDeletedAt, nativeDeletion: this.deletion.describeRecord(selected.native?.deletions?.findLast(d => d.rootThreadId === p.rootThreadId)) })), hiddenMemorySources: selected.nodes.filter(n => !visible.some(v => v.id === n.id)).map(n => ({ id: n.id, title: n.title })), native: { ...selected.native, mainThreadId: this.mainThreadId(selected), paths: this.paths(selected), forks: (selected.native?.forks || []).filter(f => !pruned.has(f.threadId)) } } : null;
-    return { version: this.version, trees: this.store.state.trees.map(t => ({ id: t.id, title: t.title, nodeCount: this.visibleNodes(t).length })), tree: view, sessions: this.sessions().filter(s => s.treeId === (treeId || selected?.id)).map(({ path: _, ...s }) => ({ ...s, pruned: this.isPruned(s) })), dataDir: this.settings.dataDir, observer: 'scoped-transcript', lastError: this.lastError };
+    return { version: this.version, runtimeId: this.runtimeId, context, trees, treeCatalog: catalog, tree: view, sessions: this.sessions().filter(s => s.treeId === selected?.id).map(({ path: _, ...s }) => ({ ...s, pruned: this.isPruned(s) })), dataDir: this.settings.dataDir, observer: 'scoped-transcript', lastError: this.lastError };
   }
-  async fork({ treeId, nodeId, title, memoryMode = 'historical' }) {
-    this.syncAll(); const tree = this.store.tree(treeId), node = this.store.node(tree, nodeId);
+  async fork(args) {
+    this.forkingTrees.set(args.treeId, (this.forkingTrees.get(args.treeId) || 0)+1);
+    try { return await this.createFork(args); }
+    finally { const count = this.forkingTrees.get(args.treeId)-1;if (count) this.forkingTrees.set(args.treeId,count);else this.forkingTrees.delete(args.treeId); }
+  }
+  async createFork({ treeId, nodeId, title, memoryMode = 'historical', contextThreadId }) {
+    this.syncAll(); const tree = this.activeTree(treeId), node = this.store.node(tree, nodeId);
     if (!this.visibleNodes(tree).some(n => n.id === nodeId)) throw new Error('此节点所在分支已剪掉，请先恢复分支');
     if (!node.forkable) throw new Error('只能从已完成轮次的最后一个提问节点分叉；本轮尚未完成或已中断');
-    const activeBindings = node.bindings.filter(b => !this.prunedThreadIds(tree).has(b.threadId));
-    const binding = activeBindings.find(b => b.threadId === node.nativeThreadId) || activeBindings[0];
+    const activeBindings = node.bindings.filter(b => !this.prunedThreadIds(tree).has(b.threadId) && this.sessions().find(s => s.threadId === b.threadId)?.sourceStatus !== 'missing');
+    const binding = activeBindings.find(b => b.threadId === contextThreadId) || activeBindings.find(b => b.threadId === node.nativeThreadId) || activeBindings[0];
     if (!binding) throw new Error('节点没有可用的原生对话关联');
     if (this.deletion.executing) throw new Error('原生删除操作进行中，请稍后创建分支');
     if (!['historical', 'latest'].includes(memoryMode)) throw new Error('记忆版本选项无效');
@@ -197,13 +210,17 @@ export class NativeTree {
     await this.link(branch.id);
     const session = this.sessions().find(s => s.threadId === branch.id); session.memoryVersion = memory.version; this.store.save();
     tree.native.forks ||= []; tree.native.forks.push(record); this.store.save(); this.version++;
-    return { ...record, url: `codex://threads/${branch.id}`, ...this.state(tree.id) };
+    return { ...record, url: `codex://threads/${branch.id}`, ...this.state(tree.id, { threadId: contextThreadId }) };
   }
-  branch({ treeId, operation, threadId, pruneId }) {
-    const tree = this.store.tree(treeId);
+  branch({ treeId, operation, threadId, pruneId, title, contextThreadId }) {
+    const tree = this.activeTree(treeId);
     tree.native ||= {}; tree.native.prunes ||= [];
-    if (operation === 'promote') return this.promoteMain({ treeId, threadId });
-    if (operation === 'prune') {
+    if (operation === 'promote') { this.promoteMain({ treeId, threadId });return this.state(treeId, { threadId: contextThreadId }); }
+    if (operation === 'rename') {
+      const fork = tree.native.forks?.find(f => f.threadId === threadId);
+      if (!fork) throw new Error('没有找到这条分支');
+      fork.title = displayTitle(title);
+    } else if (operation === 'prune') {
       const session = this.sessions().find(s => s.treeId === treeId && s.threadId === threadId);
       if (!session) throw new Error('没有找到这条分支');
       if (threadId === this.mainThreadId(tree)) throw new Error('当前主分支不能剪掉，请先把另一条路径设为主分支');
@@ -229,15 +246,19 @@ export class NativeTree {
         if (session && !session.nativeDeletedAt && !stillPruned.has(session.threadId)) { session.recording = before.recording; this.stats.delete(session.threadId); }
       }
     } else throw new Error('分支操作无效');
-    tree.updatedAt = now(); this.store.save(); this.version++; return this.state(treeId);
+    tree.updatedAt = now(); this.store.save(); this.version++; return this.state(treeId, { threadId: contextThreadId });
   }
-  memory({ treeId, content, baseVersion, sourceNodeIds = [], materialVersion }) {
-    const tree = this.store.tree(treeId); if (baseVersion !== tree.memories.at(-1).version) throw new Error('记忆已有新版本，请刷新后再保存');
-    this.store.addMemory(tree, { content, sourceNodeIds, ...(materialVersion ? { materials: this.store.memory(tree, materialVersion).materials } : {}) }); this.version++; return this.state(treeId);
+  memory({ treeId, content, baseVersion, sourceNodeIds = [], materialVersion, contextThreadId }) {
+    const tree = this.activeTree(treeId); if (baseVersion !== tree.memories.at(-1).version) throw new Error('记忆已有新版本，请刷新后再保存');
+    this.store.addMemory(tree, { content, sourceNodeIds, ...(materialVersion ? { materials: this.store.memory(tree, materialVersion).materials } : {}) }); this.version++; return this.state(treeId, { threadId: contextThreadId });
   }
-  pin({ treeId, nodeId, pinned, title }) {
-    const tree = this.store.tree(treeId), node = this.store.node(tree, nodeId); if (typeof pinned === 'boolean') node.pinned = pinned;
-    if (typeof title === 'string' && title.trim()) node.title = title.trim().slice(0, 100); this.store.save(); this.version++; return this.state(treeId);
+  pin({ treeId, nodeId, pinned, title, resetTitle, contextThreadId }) {
+    const tree = this.activeTree(treeId), node = this.store.node(tree, nodeId);
+    const renamed = title !== undefined ? displayTitle(title) : undefined;
+    if (typeof pinned === 'boolean') node.pinned = pinned;
+    if (renamed !== undefined) { node.title = renamed;node.titleCustomized = true; }
+    if (resetTitle) { node.title = node.question.split('\n')[0].slice(0,70);node.titleCustomized = false; }
+    tree.updatedAt = now();this.store.save(); this.version++; return this.state(treeId, { threadId: contextThreadId });
   }
   hook(event) {
     // Hooks never subscribe unrelated conversations. The user must first link one.

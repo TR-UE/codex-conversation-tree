@@ -1,13 +1,17 @@
 {
-  "version": "0.4.4",
+  "version": "0.4.5",
   "platform": "macOS",
-  "unitTestsPassed": 33,
+  "unitTestsPassed": 44,
   "cleanInstallVerified": true,
-  "toolDiscoveryCount": 10,
+  "toolDiscoveryCount": 11,
   "historyForkAndContinuationVerified": true,
   "mainBranchPromotionPruningAndRestoreVerified": true,
   "nativeMcpAppsRendererVerified": false,
   "browserPanelVerified": true,
   "fixturesOnly": true,
-  "userConversationsIncluded": false
+  "userConversationsIncluded": false,
+  "nodeAndBranchRenameVerified": true,
+  "wholeTreeDeleteRestoreVerified": true,
+  "currentConversationSelectionVerified": true,
+  "missingSourceMetadataCheckVerified": true
 }

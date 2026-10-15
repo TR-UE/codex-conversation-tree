@@ -1,12 +1,12 @@
 {
-  "version": "0.4.4",
-  "checkedAt": "2026-10-15T06:06:18.548Z",
-  "unitTestsPassed": 33,
+  "version": "0.4.5",
+  "checkedAt": "2026-10-15T07:23:14.045Z",
+  "unitTestsPassed": 44,
   "independentInstallPassed": true,
-  "mcpToolsDiscovered": 10,
+  "mcpToolsDiscovered": 11,
   "personalDataExcluded": true,
   "personalPathsExcluded": true,
   "experimentalHooksExcluded": true,
   "publicDemoUsesSyntheticData": true,
-  "archiveSha256": "e7238dcb614c6aacc72fc55a2ace8fbe1cbe56d63606c4077536e175fda1d0d4"
+  "archiveSha256": "340c744ad1dd9043330ffb74b779034a6cbbbb1d708070529d804142376db9a3"
 }

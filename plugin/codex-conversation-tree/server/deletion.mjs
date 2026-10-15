@@ -15,6 +15,7 @@ export class NativeDeletion {
   constructor(native) { this.native = native; this.plans = new Map(); this.executing = false; }
   describeRecord(record) { return record ? { ...record, errors: record.errors.map(e => ({ ...e, reason: explainDeletionFailure(e.message) })) } : undefined; }
   branchSessions(tree, threadId) {
+    this.native.activeTree(tree.id);
     const all = this.native.sessions().filter(s => s.treeId === tree.id);
     const root = all.find(s => s.threadId === threadId);
     if (threadId === this.native.mainThreadId(tree)) throw new Error('当前主分支不能永久删除，请先切换主分支');

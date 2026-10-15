@@ -46,7 +46,7 @@ try {
   input.on('line', line => { const message = JSON.parse(line), item = pending.get(message.id);if(item){clearTimeout(item.timer);pending.delete(message.id);message.error ? item.reject(Error(message.error.message)) : item.resolve(message.result);} });
   const rpc = (method, params) => new Promise((resolve, reject) => { const key = ++id,timer = setTimeout(() => reject(Error('MCP timeout')), 8000);pending.set(key,{ resolve,reject,timer });child.stdin.write(JSON.stringify({jsonrpc:'2.0',id:key,method,params})+'\n'); });
   const init = await rpc('initialize', { protocolVersion: '2025-11-25' });assert.equal(init.serverInfo.version, manifest.version);
-  const tools = await rpc('tools/list', {});assert.equal(tools.tools.length, 10);
+  const tools = await rpc('tools/list', {});assert.equal(tools.tools.length, 11);
   const doctor = JSON.parse(execFileSync('/bin/sh', [launch, path.join(receipt.sourceRoot, 'server/cli.mjs'), 'doctor'], { encoding: 'utf8' }));
   assert.equal(doctor.dataDir, data);assert.equal(doctor.runtime, null);
   const report = { verifiedAt: new Date().toISOString(), version: manifest.version, input: process.argv[2] ? 'unpacked ZIP' : 'source copy', isolatedProfile: true, sourcePathContainsSpaces: true, installedAndEnabled: true, otherCatalogEntriesPreserved: true, existingDataPreserved: true, relocatedPackageMcpTools: tools.tools.length, discoveryDoesNotStartRecording: true, nodeRuntime: doctor.node, userConversationsTouched: false };

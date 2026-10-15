@@ -35,6 +35,6 @@ test('MCP discovery stays dormant until an actual tool call', async t => {
   const input = readline.createInterface({ input: child.stdout });let id = 0;const pending = new Map();
   input.on('line', line => { const m = JSON.parse(line), p = pending.get(m.id);if(p){clearTimeout(p.timer);pending.delete(m.id);m.error?p.reject(Error(m.error.message)):p.resolve(m.result);} });
   const rpc = (method, params) => new Promise((resolve, reject) => { const n = ++id,timer = setTimeout(() => reject(Error('MCP timeout')), 5000);pending.set(n, { resolve, reject, timer });child.stdin.write(JSON.stringify({ id:n,jsonrpc:'2.0',method,params })+'\n'); });
-  await rpc('initialize', { protocolVersion: '2025-11-25' });const list = await rpc('tools/list', {});assert.equal(list.tools.length, 10);
+  await rpc('initialize', { protocolVersion: '2025-11-25' });const list = await rpc('tools/list', {});assert.equal(list.tools.length, 11);
   await rpc('resources/read', { uri: 'ui://conversation-tree/panel.html' });assert.equal(fs.existsSync(data), false);
 });

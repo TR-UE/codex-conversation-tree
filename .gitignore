@@ -4,7 +4,6 @@ data/
 **/store.json
 **/preferences.json
 **/installation.json
-**/runtime.*
 **/auth.json
 .env
 .env.*

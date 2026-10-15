@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "codex-conversation-tree",
-  "version": "0.4.4",
+  "version": "0.4.5",
   "description": "在本机保存 Codex 原生对话的树形记录、记忆版本，并从已完成的历史轮次分叉。",
   "author": {
     "name": "Local workspace"
