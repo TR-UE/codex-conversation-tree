@@ -1,0 +1,13 @@
+{
+  "version": "0.4.4",
+  "platform": "macOS",
+  "unitTestsPassed": 33,
+  "cleanInstallVerified": true,
+  "toolDiscoveryCount": 10,
+  "historyForkAndContinuationVerified": true,
+  "mainBranchPromotionPruningAndRestoreVerified": true,
+  "nativeMcpAppsRendererVerified": false,
+  "browserPanelVerified": true,
+  "fixturesOnly": true,
+  "userConversationsIncluded": false
+}

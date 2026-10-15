@@ -1,0 +1,22 @@
+name: 安装或使用问题
+description: 提交可复现的问题；请移除私人聊天和凭据。
+body:
+  - type: input
+    id: version
+    attributes:
+      label: 插件版本
+      placeholder: 0.4.4
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: 系统与宿主版本
+      description: macOS 版本、桌面应用名称和版本。
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+      description: 写明操作、期望结果和实际结果；不要包含私人聊天、凭据或服务器地址。
+    validations:
+      required: true

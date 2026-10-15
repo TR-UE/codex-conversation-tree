@@ -1,0 +1,12 @@
+{
+  "version": "0.4.4",
+  "checkedAt": "2026-10-15T06:06:18.548Z",
+  "unitTestsPassed": 33,
+  "independentInstallPassed": true,
+  "mcpToolsDiscovered": 10,
+  "personalDataExcluded": true,
+  "personalPathsExcluded": true,
+  "experimentalHooksExcluded": true,
+  "publicDemoUsesSyntheticData": true,
+  "archiveSha256": "e7238dcb614c6aacc72fc55a2ace8fbe1cbe56d63606c4077536e175fda1d0d4"
+}

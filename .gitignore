@@ -1,0 +1,14 @@
+# User conversations and credentials are never part of this repository.
+data/
+**/data/
+**/store.json
+**/preferences.json
+**/installation.json
+**/runtime.*
+**/auth.json
+.env
+.env.*
+.DS_Store
+node_modules/
+*.log
+*.tmp

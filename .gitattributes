@@ -1,0 +1,9 @@
+*.mjs text eol=lf
+*.py text eol=lf
+*.sh text eol=lf
+*.command text eol=lf
+*.md text eol=lf
+*.json text eol=lf
+*.yml text eol=lf
+*.png binary
+*.zip binary

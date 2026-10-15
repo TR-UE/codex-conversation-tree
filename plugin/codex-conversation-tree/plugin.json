@@ -1,0 +1,31 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "codex-conversation-tree",
+  "version": "0.4.4",
+  "description": "在本机保存 Codex 原生对话的树形记录、记忆版本，并从已完成的历史轮次分叉。",
+  "author": {
+    "name": "Local workspace"
+  },
+  "extensions": {
+    "com.openai": {
+      "requires_local_executor": true,
+      "onboardingSkill": "./skills/setup/SKILL.md",
+      "interface": {
+        "displayName": "对话树",
+        "shortDescription": "查看对话路径、管理记忆和历史分叉",
+        "longDescription": "本地对话树面板。显式关联当前 Codex 对话后，自动同步用户提问和可见回答；记录保存在桌面的 Codex-Conversation-Tree 文件夹。支持树根记忆版本和从指定已完成轮次创建原生 Codex 分支。支持切换主分支、剪枝旧主线和恢复路径。",
+        "developerName": "Local workspace",
+        "category": "Productivity",
+        "capabilities": [
+          "Interactive",
+          "Read",
+          "Write"
+        ],
+        "defaultPrompt": "打开对话树面板，关联当前对话。",
+        "brandColor": "#244f43",
+        "logo": "./assets/icon.svg",
+        "composerIcon": "./assets/icon.svg"
+      }
+    }
+  }
+}

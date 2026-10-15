@@ -1,0 +1,20 @@
+{
+  "name": "conversation-tree",
+  "interface": {
+    "displayName": "对话树"
+  },
+  "plugins": [
+    {
+      "name": "codex-conversation-tree",
+      "source": {
+        "source": "local",
+        "path": "./plugin/codex-conversation-tree"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

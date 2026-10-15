@@ -1,0 +1,14 @@
+{
+  "verifiedAt": "2026-10-15T06:01:58.197Z",
+  "version": "0.4.4",
+  "input": "unpacked ZIP",
+  "isolatedProfile": true,
+  "sourcePathContainsSpaces": true,
+  "installedAndEnabled": true,
+  "otherCatalogEntriesPreserved": true,
+  "existingDataPreserved": true,
+  "relocatedPackageMcpTools": 10,
+  "discoveryDoesNotStartRecording": true,
+  "nodeRuntime": "24.21.0",
+  "userConversationsTouched": false
+}
