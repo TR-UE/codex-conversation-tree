@@ -8,11 +8,13 @@
 
 ## 下载与安装
 
-1. [下载 macOS 安装包](dist/codex-conversation-tree-0.4.4-macOS.zip?raw=true)，解压后双击 `安装.command`。
+1. [下载 macOS 安装包](https://github.com/TR-UE/codex-conversation-tree/releases/download/v0.4.4/codex-conversation-tree-0.4.4-macOS.zip)，解压后双击 `安装.command`。
 2. 重启支持本地插件的 Codex / ChatGPT 桌面应用，在插件目录的“我的本地工具”中找到并启用“对话树”。如果已有个人插件目录，请在该目录中查找。
 3. 在一个本机对话中通过 `@` 选择“对话树”，发送：**打开对话树面板并记录当前对话。**
 
 只想查看已有记录时，发送：**查看已经记录的对话树。**
+
+版本说明与安装包校验文件见 [v0.4.4 发布页](https://github.com/TR-UE/codex-conversation-tree/releases/tag/v0.4.4)。
 
 需要已登录的桌面应用、本机 Codex CLI 和 Node.js 22 或以上；安装器优先寻找应用内置的运行环境。读取压缩的原生历史需要 Node.js 24。macOS 已验证；其他平台尚未验证。
 
